@@ -1,0 +1,51 @@
+services:
+  localstack:
+    image: localstack/snowflake
+    container_name: localstack-snowflake
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:443:443"
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN}
+    volumes:
+      - "./localstack/init:/etc/localstack/init"
+      - "localstack-vol:/var/lib/localstack"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      dbt-net:
+        aliases:
+          # Magic hostname the dbt-snowflake adapter uses for LocalStack.
+          # By aliasing the localstack service to this name on the shared network,
+          # the dbt container resolves it correctly without extra_hosts hacks.
+          - snowflake.localhost.localstack.cloud
+
+  dbt:
+    build:
+      context: ./dbt
+      dockerfile: Dockerfile
+    container_name: dbt
+    environment:
+      DBT_PROFILES_DIR: /usr/app/dbt
+    volumes:
+      # Bind mount: live code edits without image rebuilds
+      - "./dbt:/usr/app/dbt"
+      # Shared log volume — step 2 agent mounts this read-only
+      - "./logs/dbt:/usr/app/dbt/logs"
+    depends_on:
+      localstack:
+        condition: service_healthy
+    entrypoint: ["tail", "-f", "/dev/null"]
+    networks:
+      - dbt-net
+
+volumes:
+  localstack-vol:
+
+networks:
+  dbt-net:
+    driver: bridge

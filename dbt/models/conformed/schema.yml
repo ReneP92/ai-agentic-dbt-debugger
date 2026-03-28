@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: dim_user
+    description: "User dimension enriched with derived attributes (KYC status, device, active flag)."
+    columns:
+      - name: user_id
+        tests:
+          - unique
+          - not_null
+      - name: is_kyc_verified
+        tests:
+          - not_null
+      - name: is_active
+        tests:
+          - not_null
+      - name: registration_device
+        tests:
+          - accepted_values:
+              values: ['mobile', 'desktop', 'unknown']
+
+  - name: fct_bet
+    description: "Bet fact table joined to user dimension, with gross gaming revenue and settlement flags."
+    columns:
+      - name: bet_id
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        tests:
+          - not_null
+      - name: wager_amount
+        tests:
+          - not_null

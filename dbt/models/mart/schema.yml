@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: mart_bet_daily
+    description: "Daily betting metrics aggregated by sport, bet type, currency, and country."
+    columns:
+      - name: bet_date
+        tests:
+          - not_null
+      - name: total_bets
+        tests:
+          - not_null
+      - name: total_wager
+        tests:
+          - not_null

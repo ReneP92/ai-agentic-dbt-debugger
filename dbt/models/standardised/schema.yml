@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: std_user
+    description: "Type-cast and normalised user records. No business logic."
+    columns:
+      - name: user_id
+        description: "Unique user identifier."
+        tests:
+          - unique
+          - not_null
+      - name: email
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['active', 'suspended']
+      - name: kyc_level
+        tests:
+          - accepted_values:
+              values: ['none', 'partial', 'full']
+
+  - name: std_bet
+    description: "Type-cast and normalised bet records. No business logic."
+    columns:
+      - name: bet_id
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['open', 'settled', 'void']
+      - name: wager_amount
+        tests:
+          - not_null
+
+  - name: std_transaction
+    description: "Type-cast and normalised transaction records. No business logic."
+    columns:
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        tests:
+          - not_null
+      - name: transaction_type
+        tests:
+          - accepted_values:
+              values: ['deposit', 'withdrawal', 'bet', 'winnings', 'refund']

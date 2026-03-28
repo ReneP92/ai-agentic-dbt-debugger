@@ -1,0 +1,18 @@
+betting_platform:
+  target: localstack
+  outputs:
+    localstack:
+      type: snowflake
+      # LocalStack Snowflake uses a fixed magic account value (not a real account ID)
+      account: localstack
+      host: snowflake.localhost.localstack.cloud
+      port: 4566
+      user: test
+      password: test
+      database: BETTING
+      warehouse: TRANSFORM
+      # Default schema — overridden per layer in dbt_project.yml
+      schema: dbt_default
+      role: test
+      threads: 4
+      client_session_keep_alive: false

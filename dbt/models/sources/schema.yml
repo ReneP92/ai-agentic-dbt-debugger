@@ -1,0 +1,70 @@
+version: 2
+
+sources:
+  - name: raw
+    database: BETTING
+    schema: RAW
+    description: "Raw source tables landed by the data loader. Do not reference these directly — use the standardised layer."
+    tables:
+      - name: users
+        description: "Raw user registrations."
+        columns:
+          - name: id
+            description: "Unique user identifier."
+          - name: username
+          - name: email
+          - name: first_name
+          - name: last_name
+          - name: date_of_birth
+          - name: country_code
+            description: "ISO 3166-1 alpha-2 country code."
+          - name: currency_code
+            description: "ISO 4217 currency code."
+          - name: status
+            description: "active | suspended"
+          - name: kyc_level
+            description: "none | partial | full"
+          - name: registration_platform
+            description: "web | ios | android"
+          - name: created_at
+          - name: updated_at
+
+      - name: bets
+        description: "Raw betting records."
+        columns:
+          - name: id
+            description: "Unique bet identifier."
+          - name: user_id
+            description: "FK to users.id."
+          - name: status
+            description: "open | settled | void"
+          - name: bet_type
+            description: "single | accumulator"
+          - name: sport
+          - name: wager_amount
+          - name: potential_payout
+          - name: settled_amount
+          - name: outcome
+            description: "won | lost | void | NULL (open bet)"
+          - name: odds
+          - name: currency_code
+          - name: placed_at
+          - name: settled_at
+
+      - name: transactions
+        description: "Raw financial transaction ledger."
+        columns:
+          - name: id
+            description: "Unique transaction identifier."
+          - name: user_id
+            description: "FK to users.id."
+          - name: bet_id
+            description: "FK to bets.id. NULL for deposits and withdrawals."
+          - name: type
+            description: "deposit | withdrawal | bet | winnings | refund"
+          - name: amount
+            description: "Positive = credit, negative = debit."
+          - name: balance_after
+          - name: currency_code
+          - name: processed_at
+          - name: reference

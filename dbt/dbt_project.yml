@@ -1,0 +1,34 @@
+name: betting_platform
+version: "1.0.0"
+config-version: 2
+
+profile: betting_platform
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+macro-paths: ["macros"]
+
+# Logs go here — bind-mounted to ./logs/dbt on the host for agent access
+log-path: "logs"
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  betting_platform:
+    +materialized: table
+    +database: BETTING
+
+    standardised:
+      +schema: standardised
+      # Views make the local dev loop faster — no data copy on every change
+      +materialized: view
+
+    conformed:
+      +schema: conformed
+
+    mart:
+      +schema: mart
