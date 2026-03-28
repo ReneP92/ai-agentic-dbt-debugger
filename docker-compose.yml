@@ -43,6 +43,27 @@ services:
     networks:
       - dbt-net
 
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: agent
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      # Read-only access to dbt logs (agent reads manifests + JSON logs)
+      - "./logs/dbt:/usr/app/logs/dbt:ro"
+      # Read-only access to dbt model SQL (agent reads source SQL)
+      - "./dbt:/usr/app/dbt:ro"
+      # Read-write: agent writes ticket files here
+      - "./output/tickets:/usr/app/output/tickets"
+    depends_on:
+      localstack:
+        condition: service_healthy
+    entrypoint: ["tail", "-f", "/dev/null"]
+    networks:
+      - dbt-net
+
 volumes:
   localstack-vol:
 

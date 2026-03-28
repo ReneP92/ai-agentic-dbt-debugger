@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbt-debugger-agent"
+version = "0.1.0"
+description = "AI agent that reacts to dbt run failures and creates structured tickets"
+requires-python = ">=3.12"
+dependencies = [
+    "strands-agents[anthropic]",
+    "strands-agents-tools",
+]
+
+[project.scripts]
+dbt-debugger = "agent.main:main"
