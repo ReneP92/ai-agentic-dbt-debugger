@@ -20,8 +20,8 @@ help:
 	@echo "  dbt-run     Run all dbt models (via run_dbt wrapper)"
 	@echo "  dbt-test    Run all dbt tests (via run_dbt wrapper)"
 	@echo "  dbt-build   Run dbt build — models + tests in one pass"
-	@echo "  dbt-shell   Open an interactive shell in the dbt container
-  inspect     Print schema + 10 random rows for every table in LocalStack"
+	@echo "  dbt-shell   Open an interactive shell in the dbt container"
+	@echo "  inspect     Print schema + 10 random rows for every table in LocalStack"
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
