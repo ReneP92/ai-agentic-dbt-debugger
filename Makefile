@@ -55,13 +55,13 @@ dbt-deps:
 	docker compose exec dbt dbt deps
 
 dbt-run:
-	docker compose exec dbt run_dbt run
+	docker compose exec dbt sh -c "dbt deps && run_dbt run"
 
 dbt-test:
-	docker compose exec dbt run_dbt test
+	docker compose exec dbt sh -c "dbt deps && run_dbt test"
 
 dbt-build:
-	docker compose exec dbt run_dbt build
+	docker compose exec dbt sh -c "dbt deps && run_dbt build"
 
 dbt-shell:
 	docker compose exec dbt bash

@@ -5,6 +5,7 @@
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/runs/
+logs/
 
 # LocalStack persistence
 localstack-vol/
