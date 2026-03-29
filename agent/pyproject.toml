@@ -12,5 +12,8 @@ dependencies = [
     "strands-agents-tools",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["agent"]
+
 [project.scripts]
 dbt-debugger = "agent.main:main"
