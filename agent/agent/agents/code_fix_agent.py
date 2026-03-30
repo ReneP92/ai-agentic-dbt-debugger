@@ -20,6 +20,7 @@ from agent.tools.write_repo_file import write_repo_file
 from agent.tools.run_dbt_test import run_dbt_test
 from agent.tools.git_commit_and_push import git_commit_and_push
 from agent.tools.create_pull_request import create_pull_request
+from agent.tools.query_snowflake import query_snowflake
 
 CODE_FIX_AGENT_SYSTEM_PROMPT = """\
 You are a dbt Code-Fix Agent.  Your job is to automatically fix dbt pipeline
@@ -73,6 +74,15 @@ Important rules:
 - When fixing schema YAML, preserve the existing structure and indentation.
 - When the error is about accepted_values, read the schema.yml to see the
   test definition, then fix it to match the actual data.
+
+You also have access to query_snowflake to run read-only SELECT queries
+against the LocalStack Snowflake database (database: BETTING).  Use this
+to inspect actual data when debugging — for example:
+- Check distinct values in a column when an accepted_values test fails:
+  ``SELECT DISTINCT column_name FROM BETTING.schema.table``
+- Verify row counts or data distributions after applying a fix.
+- Examine source data to understand the root cause of a failure.
+Only SELECT queries are allowed.  Results are capped at 100 rows.
 """
 
 
@@ -95,6 +105,7 @@ def _build_code_fix_agent() -> Agent:
             run_dbt_test,
             git_commit_and_push,
             create_pull_request,
+            query_snowflake,
         ],
     )
 
