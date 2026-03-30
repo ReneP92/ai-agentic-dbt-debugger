@@ -5,36 +5,36 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Docker Compose (dbt-net bridge network)                            │
-│                                                                     │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │  localstack       │  │  dbt             │  │  agent           │  │
-│  │  (Snowflake emu)  │◄─┤  (Python 3.12)   │  │  (Python 3.12)   │  │
-│  │  Port 4566        │  │  dbt-snowflake   │  │  Strands Agents  │  │
-│  │                   │  │  1.9.1           │  │  Claude Sonnet 4 │  │
-│  └──────┬───────────┘  └────────┬─────────┘  └───┬──────┬───────┘  │
-│         │                       │  logs/dbt (rw)  │ (ro) │          │
-│         │                       └────────┬────────┘      │          │
-│         │                                │               │          │
-│         │                        ┌───────▼───────┐       │          │
-│         │                        │  logs/dbt/    │       │          │
-│         │                        │  runs/        │       │          │
-│         │                        └───────────────┘       │          │
-│         │                                                │          │
-│         │                        ┌───────────────┐       │          │
-│         │                        │  output/      │◄──────┘          │
-│         │                        │  tickets/     │  (rw)            │
-│         │                        └───────┬───────┘                  │
-│         │                                │ (ro)                     │
-│         │  ┌──────────────────┐          │                          │
-│         │  │  code-env         │◄─────────┘                         │
-│         ◄──┤  (Python 3.12)   │  reads tickets, runs dbt test      │
-│            │  git + gh CLI    │  clones repo, pushes fix, opens PR  │
-│            │  dbt-snowflake   │                                     │
-│            │  Strands Agents  │                                     │
-│            └──────────────────┘                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Docker Compose (dbt-net bridge network)                             │
+│                                                                      │
+│  ┌───────────────────┐  ┌──────────────────┐  ┌───────────────────┐  │
+│  │  localstack       │  │  dbt             │  │  agent            │  │
+│  │  (Snowflake emu)  │◄─┤  (Python 3.12)   │  │  (Python 3.12)    │  │
+│  │  Port 4566        │  │  dbt-snowflake   │  │  Strands Agents   │  │
+│  │                   │  │  1.9.1           │  │  Claude Sonnet 4  │  │
+│  └──────┬────────────┘  └────────┬─────────┘  └────┬──────┬───────┘  │
+│         │                        │  logs/dbt (rw)  │ (ro) │          │
+│         │                        └────────┬────────┘      │          │
+│         │                                 │               │          │
+│         │                         ┌───────▼───────┐       │          │
+│         │                         │  logs/dbt/    │       │          │
+│         │                         │  runs/        │       │          │
+│         │                         └───────────────┘       │          │
+│         │                                                 │          │
+│         │                         ┌───────────────┐       │          │
+│         │                         │  output/      │◄──────┘          │
+│         │                         │  tickets/     │  (rw)            │
+│         │                         └───────┬───────┘                  │
+│         │                                 │ (ro)                     │
+│         │  ┌───────────────────┐          │                          │
+│         │  │  code-env         │◄─────────┘                          │
+│         ◄──┤  (Python 3.12)    │  reads tickets, runs dbt test       │
+│            │  git + gh CLI     │  clones repo, pushes fix, opens PR  │
+│            │  dbt-snowflake    │                                     │
+│            │  Strands Agents   │                                     │
+│            └───────────────────┘                                     │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 **LocalStack Snowflake** emulates a Snowflake warehouse locally so no cloud account is needed. The **dbt** container runs as a long-lived sidecar and all commands are issued via `docker compose exec`. The **agent** container runs the AI debugging agent -- it reads dbt logs and model SQL (read-only) and writes failure tickets to `output/tickets/`. The **code-env** container runs the Code-Fix agent -- it reads the ticket, clones the repo, fixes the dbt code, verifies with `dbt test`, and opens a GitHub PR.
