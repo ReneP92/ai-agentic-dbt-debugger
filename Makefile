@@ -2,7 +2,7 @@
         dbt-debug dbt-run dbt-test dbt-build dbt-shell dbt-deps inspect \
         dbt-run-agent dbt-test-agent dbt-build-agent agent-shell agent-run \
         code-env-shell code-fix \
-        monitor-open monitor-logs
+        monitor-open monitor-logs monitor-dev monitor-build
 
 # Default target
 help:
@@ -40,6 +40,8 @@ help:
 	@echo "Observability"
 	@echo "  monitor-open    Open the Agent Monitor UI in your browser (http://localhost:3001)"
 	@echo "  monitor-logs    Follow logs for the monitor service"
+	@echo "  monitor-build   Build the React frontend (outputs to monitor/static/)"
+	@echo "  monitor-dev     Start backend + React dev server with hot reload (port 5173)"
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
@@ -122,3 +124,13 @@ monitor-open:  ## Open Agent Monitor UI in browser
 
 monitor-logs:  ## Follow monitor service logs
 	docker compose logs -f monitor
+
+monitor-build:  ## Build the React frontend (outputs to monitor/static/)
+	cd monitor/frontend && npm install && npm run build
+
+monitor-dev:  ## Start monitor backend + React dev server (hot reload)
+	@echo "Starting monitor dev servers..."
+	@echo "  Backend: http://localhost:8765"
+	@echo "  Frontend: http://localhost:5173"
+	@cd monitor && uvicorn server:app --host 0.0.0.0 --port 8765 --reload & \
+	 cd monitor/frontend && npm install && npm run dev
