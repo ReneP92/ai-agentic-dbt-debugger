@@ -1,6 +1,6 @@
 # ai-agentic-dbt-debugger
 
-A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates structured failure tickets, and opens GitHub pull requests with automated fixes.
+A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates structured failure tickets, and opens GitHub pull requests with automated fixes. Includes a self-hosted [Langfuse](https://langfuse.com/) observability UI for monitoring agent traces, LLM calls, tool usage, and token costs.
 
 ## Architecture
 
@@ -14,8 +14,8 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 │  │  Port 4566        │  │  dbt-snowflake   │  │  Strands Agents   │  │
 │  │                   │  │  1.9.1           │  │  Claude Sonnet 4  │  │
 │  └──────┬────────────┘  └────────┬─────────┘  └────┬──────┬───────┘  │
-│         │                        │  logs/dbt (rw)  │ (ro) │          │
-│         │                        └────────┬────────┘      │          │
+│         │                        │  logs/dbt (rw)  │ (ro) │ OTLP     │
+│         │                        └────────┬────────┘      │ traces   │
 │         │                                 │               │          │
 │         │                         ┌───────▼───────┐       │          │
 │         │                         │  logs/dbt/    │       │          │
@@ -31,9 +31,20 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 │         │  │  code-env         │◄─────────┘                          │
 │         ◄──┤  (Python 3.12)    │  reads tickets, runs dbt test       │
 │            │  git + gh CLI     │  clones repo, pushes fix, opens PR  │
-│            │  dbt-snowflake    │                                     │
-│            │  Strands Agents   │                                     │
-│            └───────────────────┘                                     │
+│            │  dbt-snowflake    │──┐ OTLP traces                     │
+│            │  Strands Agents   │  │                                  │
+│            └───────────────────┘  │                                  │
+│                                   │                                  │
+│  ┌────────────────────────────────▼─────────────────────────────┐    │
+│  │  Langfuse Observability Stack                                │    │
+│  │                                                              │    │
+│  │  langfuse-web (:3000)    ◄── Browser UI                      │    │
+│  │  langfuse-worker         ◄── Async trace processing          │    │
+│  │  langfuse-postgres       ◄── Transactional data              │    │
+│  │  langfuse-clickhouse     ◄── OLAP trace storage              │    │
+│  │  langfuse-redis          ◄── Cache + queue                   │    │
+│  │  langfuse-minio          ◄── Blob/event storage              │    │
+│  └──────────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -152,6 +163,36 @@ output/tickets/<run_id>_ticket.txt
 
 **Safety constraints:** The code-fix agent can only modify files under `dbt/models/` -- it cannot touch infrastructure, agent code, or anything outside the dbt models directory.
 
+### Observability (Langfuse)
+
+All agent traces are exported via OpenTelemetry to a self-hosted [Langfuse](https://langfuse.com/) instance running as a sidecar in Docker Compose. Langfuse is an open-source LLM observability platform (similar to LangSmith) that provides:
+
+- **Trace viewer** -- hierarchical view of agent execution: Orchestrator -> Cycle -> Model Invoke / Tool Call
+- **Generation details** -- full prompt/response for every LLM call, with model ID and parameters
+- **Token usage** -- input/output/cache token counts per generation and per trace
+- **Tool call tracking** -- tool name, inputs, outputs, duration, success/failure status
+- **Cost analysis** -- aggregate token usage and cost tracking over time
+- **Session grouping** -- traces are grouped by run ID so you can see all agent activity for a single dbt failure
+
+**Access the UI:**
+
+```bash
+make langfuse-open    # Opens http://localhost:3000
+```
+
+**Default credentials:** `admin@local.dev` / `password`
+
+The Strands Agents SDK natively emits OpenTelemetry spans with `gen_ai.*` attributes (model, tokens, prompts, tool calls). Langfuse maps these to its data model automatically -- no additional instrumentation libraries are needed.
+
+**How it works:**
+
+1. Both agent entrypoints (`main.py`, `code_fix_main.py`) call `setup_telemetry()` at startup
+2. This configures the Strands `StrandsTelemetry` OTLP exporter with Langfuse's `/api/public/otel` endpoint
+3. Strands automatically creates spans for every agent cycle, model invocation, and tool call
+4. Langfuse ingests these via OTLP HTTP and renders them in its web UI
+
+If `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` are not set, telemetry is silently skipped and the agents work as before.
+
 ### Ticket Contents
 
 Each ticket file includes:
@@ -180,6 +221,7 @@ Each ticket file includes:
     cp .env.example .env
     # Edit .env and add your LOCALSTACK_AUTH_TOKEN, ANTHROPIC_API_KEY,
     # GITHUB_AUTH_TOKEN, and GITHUB_REPO_URL
+    # (Langfuse credentials have working defaults — no changes needed)
    ```
 
 2. **Build and start:**
@@ -189,7 +231,7 @@ Each ticket file includes:
    make up
    ```
 
-   This starts the LocalStack Snowflake emulator, the dbt container, the agent container, and the code-env container. On startup, the init script (`localstack/init/ready.d/01_seed.py`) automatically creates the `BETTING` database, schemas, tables, and seed data.
+   This starts the LocalStack Snowflake emulator, the dbt container, the agent container, the code-env container, and the Langfuse observability stack. On startup, the init script (`localstack/init/ready.d/01_seed.py`) automatically creates the `BETTING` database, schemas, tables, and seed data. Langfuse auto-initializes with a default org, project, and API keys.
 
 3. **Verify the setup:**
 
@@ -273,12 +315,18 @@ Each ticket file includes:
 | `make code-fix RUN_ID=<id>` | Manually invoke code-fix agent for a specific run ID |
 | `make code-env-shell` | Open an interactive shell in the code-env container |
 
+### Observability
+
+| Target | Description |
+|---|---|
+| `make langfuse-open` | Open the Langfuse UI in your browser (http://localhost:3000) |
+
 ## Project Structure
 
 ```
 .
 ├── Makefile                          # All commands
-├── docker-compose.yml                # LocalStack + dbt + agent + code-env services
+├── docker-compose.yml                # LocalStack + dbt + agent + code-env + Langfuse services
 ├── .env.example                      # Template for secrets
 ├── agent/
 │   ├── Dockerfile                    # Python 3.12 + strands-agents
@@ -287,6 +335,7 @@ Each ticket file includes:
 │       ├── main.py                   # Entrypoint — accepts run_id, runs orchestrator
 │       ├── orchestrator.py           # Orchestrator agent (system prompt + tools)
 │       ├── code_fix_main.py          # Entrypoint — accepts run_id, runs code-fix agent
+│       ├── telemetry.py              # OTEL setup — exports Strands traces to Langfuse
 │       ├── agents/
 │       │   ├── ticket_agent.py       # Ticket Creator sub-agent (wrapped as @tool)
 │       │   └── code_fix_agent.py     # Code-Fix sub-agent (wrapped as @tool)
@@ -301,7 +350,8 @@ Each ticket file includes:
 │           ├── write_repo_file.py    # Write file in cloned workspace
 │           ├── run_dbt_test.py       # Run dbt test for verification
 │           ├── git_commit_and_push.py # Commit + push fix branch
-│           └── create_pull_request.py # Create GitHub PR via gh CLI
+│           ├── create_pull_request.py # Create GitHub PR via gh CLI
+│           └── query_snowflake.py    # Read-only SQL queries against Snowflake
 ├── code-env/
 │   └── Dockerfile                    # Python 3.12 + git + gh CLI + dbt + agent
 ├── dbt/

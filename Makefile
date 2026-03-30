@@ -1,7 +1,8 @@
 .PHONY: help build up down restart logs ps clean \
         dbt-debug dbt-run dbt-test dbt-build dbt-shell dbt-deps inspect \
         dbt-run-agent dbt-test-agent dbt-build-agent agent-shell agent-run \
-        code-env-shell code-fix
+        code-env-shell code-fix \
+        langfuse-open
 
 # Default target
 help:
@@ -35,6 +36,9 @@ help:
 	@echo "Code-Fix"
 	@echo "  code-fix        Manually invoke code-fix agent (make code-fix RUN_ID=...)"
 	@echo "  code-env-shell  Open an interactive shell in the code-env container"
+	@echo ""
+	@echo "Observability"
+	@echo "  langfuse-open   Open the Langfuse UI in your browser (http://localhost:3000)"
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
@@ -108,3 +112,10 @@ code-fix:
 
 code-env-shell:
 	docker compose exec code-env bash
+
+# ── Observability ─────────────────────────────────────────────────────────────
+
+langfuse-open:  ## Open Langfuse UI in browser
+	@echo "Opening Langfuse at http://localhost:3000 ..."
+	@echo "Default credentials: admin@local.dev / password"
+	@open http://localhost:3000 2>/dev/null || xdg-open http://localhost:3000 2>/dev/null || echo "Visit http://localhost:3000"

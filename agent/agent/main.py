@@ -11,6 +11,7 @@ import sys
 import warnings
 
 from agent.orchestrator import build_orchestrator
+from agent.telemetry import setup_telemetry
 
 # Suppress Pydantic serialization warnings from the Anthropic SDK
 # (ParsedTextBlock vs expected block type mismatches).
@@ -24,9 +25,12 @@ def main() -> None:
 
     run_id = sys.argv[1]
 
+    # Configure OTEL trace export to Langfuse (no-op if creds not set)
+    setup_telemetry()
+
     print(f"[agent] Investigating failed dbt run: {run_id}")
 
-    orchestrator = build_orchestrator()
+    orchestrator = build_orchestrator(run_id=run_id)
     response = orchestrator(
         f"A dbt run has failed.  Run ID: {run_id}.  "
         f"Please investigate the failure and create a ticket."

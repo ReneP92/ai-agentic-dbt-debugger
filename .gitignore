@@ -1,6 +1,7 @@
 # Environment
 .env
 
+.opencode/
 # dbt artifacts (generated, not source)
 dbt/target/
 dbt/dbt_packages/

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "AI agent that reacts to dbt run failures and creates structured tickets"
 requires-python = ">=3.12"
 dependencies = [
-    "strands-agents[anthropic]",
+    "strands-agents[anthropic,otel]",
     "strands-agents-tools",
 ]
 

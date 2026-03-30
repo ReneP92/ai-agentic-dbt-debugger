@@ -49,7 +49,7 @@ Important:
 """
 
 
-def build_orchestrator() -> Agent:
+def build_orchestrator(run_id: str = "") -> Agent:
     """Construct the orchestrator agent with all tools wired up."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
@@ -66,4 +66,10 @@ def build_orchestrator() -> Agent:
             read_model_sql,
             ticket_agent,
         ],
+        trace_attributes={
+            "session.id": f"ticket-{run_id}",
+            "langfuse.session.id": f"ticket-{run_id}",
+            "langfuse.user.id": "dbt-debugger",
+            "langfuse.trace.tags": ["ticket-agent", f"run:{run_id}"],
+        },
     )

@@ -18,13 +18,14 @@ from strands import Agent
 from strands.models.anthropic import AnthropicModel
 
 from agent.agents.code_fix_agent import code_fix_agent
+from agent.telemetry import setup_telemetry
 
 # Suppress Pydantic serialization warnings from the Anthropic SDK
 # (ParsedTextBlock vs expected block type mismatches).
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 
-def build_code_fix_orchestrator() -> Agent:
+def build_code_fix_orchestrator(run_id: str = "") -> Agent:
     """Construct a lightweight orchestrator that delegates to the code-fix agent."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
@@ -41,6 +42,12 @@ def build_code_fix_orchestrator() -> Agent:
             "explanation of why the fix could not be applied."
         ),
         tools=[code_fix_agent],
+        trace_attributes={
+            "session.id": f"code-fix-{run_id}",
+            "langfuse.session.id": f"code-fix-{run_id}",
+            "langfuse.user.id": "dbt-debugger",
+            "langfuse.trace.tags": ["code-fix-agent", f"run:{run_id}"],
+        },
     )
 
 
@@ -51,9 +58,12 @@ def main() -> None:
 
     run_id = sys.argv[1]
 
+    # Configure OTEL trace export to Langfuse (no-op if creds not set)
+    setup_telemetry()
+
     print(f"[code-fix] Attempting automated fix for failed dbt run: {run_id}")
 
-    orchestrator = build_code_fix_orchestrator()
+    orchestrator = build_code_fix_orchestrator(run_id=run_id)
     response = orchestrator(
         f"A dbt run has failed and a ticket exists.  Run ID: {run_id}.  "
         f"Please invoke the code-fix agent to attempt an automated fix."
