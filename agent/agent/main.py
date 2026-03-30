@@ -8,8 +8,13 @@ Usage:
 """
 
 import sys
+import warnings
 
 from agent.orchestrator import build_orchestrator
+
+# Suppress Pydantic serialization warnings from the Anthropic SDK
+# (ParsedTextBlock vs expected block type mismatches).
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 
 def main() -> None:

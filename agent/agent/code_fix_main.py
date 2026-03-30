@@ -12,11 +12,16 @@ Exits with code 0 on success, 1 on failure.
 
 import os
 import sys
+import warnings
 
 from strands import Agent
 from strands.models.anthropic import AnthropicModel
 
 from agent.agents.code_fix_agent import code_fix_agent
+
+# Suppress Pydantic serialization warnings from the Anthropic SDK
+# (ParsedTextBlock vs expected block type mismatches).
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 
 def build_code_fix_orchestrator() -> Agent:
