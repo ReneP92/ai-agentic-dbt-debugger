@@ -21,7 +21,7 @@ def clone_repo(run_id: str) -> str:
 
     Requires environment variables:
     - GITHUB_REPO_URL: The HTTPS URL of the repository.
-    - GITHUB_TOKEN: A GitHub PAT with push access.
+    - GITHUB_AUTH_TOKEN: A GitHub PAT with push access.
 
     Args:
         run_id: The dbt run identifier, used to name the fix branch.
@@ -31,12 +31,12 @@ def clone_repo(run_id: str) -> str:
         error message if cloning fails.
     """
     repo_url = os.environ.get("GITHUB_REPO_URL", "")
-    token = os.environ.get("GITHUB_TOKEN", "")
+    token = os.environ.get("GITHUB_AUTH_TOKEN", "")
 
     if not repo_url:
         return json.dumps({"error": "GITHUB_REPO_URL environment variable is not set"})
     if not token:
-        return json.dumps({"error": "GITHUB_TOKEN environment variable is not set"})
+        return json.dumps({"error": "GITHUB_AUTH_TOKEN environment variable is not set"})
 
     # Inject token into the HTTPS URL for authentication
     # https://github.com/org/repo.git -> https://<token>@github.com/org/repo.git

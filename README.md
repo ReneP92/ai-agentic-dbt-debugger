@@ -179,7 +179,7 @@ Each ticket file includes:
    cd ai-agentic-dbt-debugger
     cp .env.example .env
     # Edit .env and add your LOCALSTACK_AUTH_TOKEN, ANTHROPIC_API_KEY,
-    # GITHUB_TOKEN, and GITHUB_REPO_URL
+    # GITHUB_AUTH_TOKEN, and GITHUB_REPO_URL
    ```
 
 2. **Build and start:**
@@ -220,7 +220,7 @@ Each ticket file includes:
 
    # The agent will:
    # 1. Investigate and write a ticket to output/tickets/
-   # 2. Attempt an automated fix and open a GitHub PR (requires GITHUB_TOKEN)
+   # 2. Attempt an automated fix and open a GitHub PR (requires GITHUB_AUTH_TOKEN)
    ```
 
    To manually invoke individual agents against a past failed run:
@@ -365,6 +365,6 @@ You should see `BETTING database seeded successfully.` in the output.
 
 **Agent fails with authentication error** -- Ensure `ANTHROPIC_API_KEY` is set in your `.env` file. The agent container reads this at startup. After updating `.env`, restart the agent: `docker compose restart agent`.
 
-**Code-fix agent fails to push/create PR** -- Ensure `GITHUB_TOKEN` and `GITHUB_REPO_URL` are set in your `.env` file. The token needs repo push and PR creation permissions. After updating `.env`, restart the code-env container: `docker compose restart code-env`.
+**Code-fix agent fails to push/create PR** -- Ensure `GITHUB_AUTH_TOKEN` and `GITHUB_REPO_URL` are set in your `.env` file. The token needs repo push and PR creation permissions. After updating `.env`, restart the code-env container: `docker compose restart code-env`.
 
 **Agent container not starting** -- Run `make build` to rebuild the agent image after any changes to `agent/`, then `make up`.

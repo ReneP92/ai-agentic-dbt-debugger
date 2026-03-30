@@ -19,7 +19,7 @@ def create_pull_request(
 ) -> str:
     """Create a GitHub pull request for the fix branch using the ``gh`` CLI.
 
-    Requires the ``GITHUB_TOKEN`` environment variable to be set for
+    Requires the ``GITHUB_AUTH_TOKEN`` environment variable to be set for
     authentication.  The PR is created from the workspace directory where
     the repository was cloned.
 
@@ -35,9 +35,9 @@ def create_pull_request(
         A JSON string with ``pr_url`` and ``pr_number`` fields, or an
         error message if PR creation fails.
     """
-    token = os.environ.get("GITHUB_TOKEN", "")
+    token = os.environ.get("GITHUB_AUTH_TOKEN", "")
     if not token:
-        return json.dumps({"error": "GITHUB_TOKEN environment variable is not set"})
+        return json.dumps({"error": "GITHUB_AUTH_TOKEN environment variable is not set"})
 
     if not WORKSPACE.exists():
         return json.dumps({"error": "Workspace does not exist — clone the repo first."})
@@ -45,7 +45,7 @@ def create_pull_request(
     env = {
         "PATH": "/usr/local/bin:/usr/bin:/bin",
         "HOME": "/root",
-        "GITHUB_TOKEN": token,
+        "GITHUB_TOKEN": token,  # gh CLI expects GITHUB_TOKEN
     }
 
     result = subprocess.run(
