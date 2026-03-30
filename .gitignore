@@ -20,5 +20,8 @@ venv/
 # Agent output (tickets are generated artifacts)
 output/tickets/*.txt
 
+# Code-fix agent workspace (cloned repos inside container, but just in case)
+workspace/
+
 # macOS
 .DS_Store

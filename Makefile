@@ -1,6 +1,7 @@
 .PHONY: help build up down restart logs ps clean \
         dbt-debug dbt-run dbt-test dbt-build dbt-shell dbt-deps inspect \
-        dbt-run-agent dbt-test-agent dbt-build-agent agent-shell agent-run
+        dbt-run-agent dbt-test-agent dbt-build-agent agent-shell agent-run \
+        code-env-shell code-fix
 
 # Default target
 help:
@@ -30,6 +31,10 @@ help:
 	@echo "  dbt-build-agent Run dbt build; invoke agent on failure"
 	@echo "  agent-run       Manually invoke agent for a run ID (make agent-run RUN_ID=...)"
 	@echo "  agent-shell     Open an interactive shell in the agent container"
+	@echo ""
+	@echo "Code-Fix"
+	@echo "  code-fix        Manually invoke code-fix agent (make code-fix RUN_ID=...)"
+	@echo "  code-env-shell  Open an interactive shell in the code-env container"
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
@@ -94,3 +99,12 @@ agent-run:
 
 agent-shell:
 	docker compose exec agent bash
+
+# ── Code-Fix ──────────────────────────────────────────────────────────────────
+
+code-fix:
+	@test -n "$(RUN_ID)" || (echo "Usage: make code-fix RUN_ID=<run_id>" && exit 1)
+	docker compose exec code-env python -m agent.code_fix_main $(RUN_ID)
+
+code-env-shell:
+	docker compose exec code-env bash

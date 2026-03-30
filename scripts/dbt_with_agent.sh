@@ -46,4 +46,18 @@ if [ "$AGENT_EXIT" -ne 0 ]; then
 fi
 
 echo "=== Done. Check output/tickets/ for the failure ticket. ==="
+
+# ── Step 2: Code-Fix Agent ────────────────────────────────────────────────────
+# Attempt an automated fix: clone repo, modify dbt files, verify, and open a PR.
+
+echo "=== Code-fix agent attempting automated fix for run_id: ${RUN_ID} ==="
+docker compose exec code-env python -m agent.code_fix_main "$RUN_ID"
+CODE_FIX_EXIT=$?
+
+if [ "$CODE_FIX_EXIT" -eq 0 ]; then
+    echo "=== Code-fix agent succeeded — check GitHub for the pull request. ==="
+else
+    echo "[WARN] Code-fix agent exited with code ${CODE_FIX_EXIT} — automated fix was not applied."
+fi
+
 exit "$DBT_EXIT"

@@ -64,6 +64,27 @@ services:
     networks:
       - dbt-net
 
+  code-env:
+    build:
+      context: .
+      dockerfile: code-env/Dockerfile
+    container_name: code-env
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO_URL: ${GITHUB_REPO_URL}
+    volumes:
+      # Read-only access to tickets (code-fix agent reads the failure ticket)
+      - "./output/tickets:/usr/app/output/tickets:ro"
+      # Read-only access to dbt logs (for additional context)
+      - "./logs/dbt:/usr/app/logs/dbt:ro"
+    depends_on:
+      localstack:
+        condition: service_healthy
+    entrypoint: ["tail", "-f", "/dev/null"]
+    networks:
+      - dbt-net
+
 volumes:
   localstack-vol:
 
