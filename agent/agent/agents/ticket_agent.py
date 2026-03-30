@@ -35,6 +35,15 @@ Your job:
 Be direct, technical, and actionable.  Do NOT include pleasantries or filler.
 """
 
+# Module-level monitor reference — set by the entrypoint before agent runs
+_monitor = None
+
+
+def set_monitor(monitor) -> None:
+    """Set the shared monitor instance for sub-agent observability."""
+    global _monitor
+    _monitor = monitor
+
 
 def _build_ticket_agent() -> Agent:
     """Construct the ticket creator agent with its own model and tools."""
@@ -44,10 +53,16 @@ def _build_ticket_agent() -> Agent:
         max_tokens=4096,
     )
 
+    kwargs = {}
+    if _monitor and _monitor.hook_provider:
+        kwargs["hooks"] = [_monitor.hook_provider]
+        kwargs["callback_handler"] = _monitor.callback_handler
+
     return Agent(
         model=model,
         system_prompt=TICKET_AGENT_SYSTEM_PROMPT,
         tools=[create_ticket],
+        **kwargs,
     )
 
 

@@ -2,7 +2,7 @@
         dbt-debug dbt-run dbt-test dbt-build dbt-shell dbt-deps inspect \
         dbt-run-agent dbt-test-agent dbt-build-agent agent-shell agent-run \
         code-env-shell code-fix \
-        langfuse-open
+        monitor-open monitor-logs
 
 # Default target
 help:
@@ -38,7 +38,8 @@ help:
 	@echo "  code-env-shell  Open an interactive shell in the code-env container"
 	@echo ""
 	@echo "Observability"
-	@echo "  langfuse-open   Open the Langfuse UI in your browser (http://localhost:3000)"
+	@echo "  monitor-open    Open the Agent Monitor UI in your browser (http://localhost:3001)"
+	@echo "  monitor-logs    Follow logs for the monitor service"
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
@@ -115,7 +116,9 @@ code-env-shell:
 
 # ── Observability ─────────────────────────────────────────────────────────────
 
-langfuse-open:  ## Open Langfuse UI in browser
-	@echo "Opening Langfuse at http://localhost:3000 ..."
-	@echo "Default credentials: admin@local.dev / password"
-	@open http://localhost:3000 2>/dev/null || xdg-open http://localhost:3000 2>/dev/null || echo "Visit http://localhost:3000"
+monitor-open:  ## Open Agent Monitor UI in browser
+	@echo "Opening Agent Monitor at http://localhost:3001 ..."
+	@open http://localhost:3001 2>/dev/null || xdg-open http://localhost:3001 2>/dev/null || echo "Visit http://localhost:3001"
+
+monitor-logs:  ## Follow monitor service logs
+	docker compose logs -f monitor

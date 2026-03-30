@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dbt Agent Monitor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>dbt Agent Monitor</h1>
+      <span id="connection-status" class="status-disconnected">disconnected</span>
+    </div>
+    <div class="header-right">
+      <select id="run-select">
+        <option value="">Select a run...</option>
+      </select>
+      <button id="btn-refresh" title="Refresh runs">&#x21bb;</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Run summary bar -->
+    <div id="run-summary" class="run-summary hidden">
+      <div class="summary-item">
+        <span class="summary-label">Run</span>
+        <span id="summary-run-id" class="summary-value">-</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Type</span>
+        <span id="summary-agent-type" class="summary-value">-</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Status</span>
+        <span id="summary-status" class="summary-value">-</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Duration</span>
+        <span id="summary-duration" class="summary-value">-</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Tokens In</span>
+        <span id="summary-tokens-in" class="summary-value">-</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Tokens Out</span>
+        <span id="summary-tokens-out" class="summary-value">-</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Cost</span>
+        <span id="summary-cost" class="summary-value">-</span>
+      </div>
+    </div>
+
+    <!-- Event log -->
+    <div id="event-log" class="event-log">
+      <div class="empty-state">
+        <p>No events yet. Start an agent run or select a historical run.</p>
+      </div>
+    </div>
+
+    <!-- Auto-scroll toggle -->
+    <div class="scroll-controls">
+      <label>
+        <input type="checkbox" id="auto-scroll" checked>
+        Auto-scroll
+      </label>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -85,6 +85,15 @@ to inspect actual data when debugging — for example:
 Only SELECT queries are allowed.  Results are capped at 100 rows.
 """
 
+# Module-level monitor reference — set by the entrypoint before agent runs
+_monitor = None
+
+
+def set_monitor(monitor) -> None:
+    """Set the shared monitor instance for sub-agent observability."""
+    global _monitor
+    _monitor = monitor
+
 
 def _build_code_fix_agent() -> Agent:
     """Construct the code-fix agent with its own model and tools."""
@@ -93,6 +102,11 @@ def _build_code_fix_agent() -> Agent:
         model_id="claude-sonnet-4-20250514",
         max_tokens=8192,
     )
+
+    kwargs = {}
+    if _monitor and _monitor.hook_provider:
+        kwargs["hooks"] = [_monitor.hook_provider]
+        kwargs["callback_handler"] = _monitor.callback_handler
 
     return Agent(
         model=model,
@@ -107,6 +121,7 @@ def _build_code_fix_agent() -> Agent:
             create_pull_request,
             query_snowflake,
         ],
+        **kwargs,
     )
 
 

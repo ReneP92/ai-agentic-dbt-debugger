@@ -1,6 +1,6 @@
 # ai-agentic-dbt-debugger
 
-A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates structured failure tickets, and opens GitHub pull requests with automated fixes. Includes a self-hosted [Langfuse](https://langfuse.com/) observability UI for monitoring agent traces, LLM calls, tool usage, and token costs.
+A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates structured failure tickets, and opens GitHub pull requests with automated fixes. Includes a lightweight live monitoring dashboard for watching agent execution in real time — LLM calls, tool usage, token counts, and cost estimates streamed via WebSocket.
 
 ## Architecture
 
@@ -14,8 +14,8 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 │  │  Port 4566        │  │  dbt-snowflake   │  │  Strands Agents   │  │
 │  │                   │  │  1.9.1           │  │  Claude Sonnet 4  │  │
 │  └──────┬────────────┘  └────────┬─────────┘  └────┬──────┬───────┘  │
-│         │                        │  logs/dbt (rw)  │ (ro) │ OTLP     │
-│         │                        └────────┬────────┘      │ traces   │
+│         │                        │  logs/dbt (rw)  │ (ro) │ WS push  │
+│         │                        └────────┬────────┘      │          │
 │         │                                 │               │          │
 │         │                         ┌───────▼───────┐       │          │
 │         │                         │  logs/dbt/    │       │          │
@@ -31,24 +31,19 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 │         │  │  code-env         │◄─────────┘                          │
 │         ◄──┤  (Python 3.12)    │  reads tickets, runs dbt test       │
 │            │  git + gh CLI     │  clones repo, pushes fix, opens PR  │
-│            │  dbt-snowflake    │──┐ OTLP traces                     │
+│            │  dbt-snowflake    │──┐ WS push                         │
 │            │  Strands Agents   │  │                                  │
 │            └───────────────────┘  │                                  │
 │                                   │                                  │
-│  ┌────────────────────────────────▼─────────────────────────────┐    │
-│  │  Langfuse Observability Stack                                │    │
-│  │                                                              │    │
-│  │  langfuse-web (:3000)    ◄── Browser UI                      │    │
-│  │  langfuse-worker         ◄── Async trace processing          │    │
-│  │  langfuse-postgres       ◄── Transactional data              │    │
-│  │  langfuse-clickhouse     ◄── OLAP trace storage              │    │
-│  │  langfuse-redis          ◄── Cache + queue                   │    │
-│  │  langfuse-minio          ◄── Blob/event storage              │    │
-│  └──────────────────────────────────────────────────────────────┘    │
+│            ┌──────────────────────▼────────────────┐                 │
+│            │  monitor (:3001)                      │                 │
+│            │  FastAPI + WebSocket + SQLite          │                 │
+│            │  Vanilla HTML/JS/CSS dashboard         │                 │
+│            └───────────────────────────────────────┘                 │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**LocalStack Snowflake** emulates a Snowflake warehouse locally so no cloud account is needed. The **dbt** container runs as a long-lived sidecar and all commands are issued via `docker compose exec`. The **agent** container runs the AI debugging agent -- it reads dbt logs and model SQL (read-only) and writes failure tickets to `output/tickets/`. The **code-env** container runs the Code-Fix agent -- it reads the ticket, clones the repo, fixes the dbt code, verifies with `dbt test`, and opens a GitHub PR.
+**LocalStack Snowflake** emulates a Snowflake warehouse locally so no cloud account is needed. The **dbt** container runs as a long-lived sidecar and all commands are issued via `docker compose exec`. The **agent** container runs the AI debugging agent -- it reads dbt logs and model SQL (read-only) and writes failure tickets to `output/tickets/`. The **code-env** container runs the Code-Fix agent -- it reads the ticket, clones the repo, fixes the dbt code, verifies with `dbt test`, and opens a GitHub PR. The **monitor** container provides a real-time browser dashboard for watching agent execution.
 
 ## Data Model
 
@@ -163,35 +158,37 @@ output/tickets/<run_id>_ticket.txt
 
 **Safety constraints:** The code-fix agent can only modify files under `dbt/models/` -- it cannot touch infrastructure, agent code, or anything outside the dbt models directory.
 
-### Observability (Langfuse)
+### Live Agent Monitor
 
-All agent traces are exported via OpenTelemetry to a self-hosted [Langfuse](https://langfuse.com/) instance running as a sidecar in Docker Compose. Langfuse is an open-source LLM observability platform (similar to LangSmith) that provides:
+Agent execution is observable in real time through a lightweight browser-based dashboard. Both the ticket agent and code-fix agent push events over WebSocket to the monitor server, which stores them in SQLite and broadcasts them to any connected browser clients.
 
-- **Trace viewer** -- hierarchical view of agent execution: Orchestrator -> Cycle -> Model Invoke / Tool Call
-- **Generation details** -- full prompt/response for every LLM call, with model ID and parameters
-- **Token usage** -- input/output/cache token counts per generation and per trace
-- **Tool call tracking** -- tool name, inputs, outputs, duration, success/failure status
-- **Cost analysis** -- aggregate token usage and cost tracking over time
-- **Session grouping** -- traces are grouped by run ID so you can see all agent activity for a single dbt failure
+The dashboard shows:
+
+- **Run lifecycle** -- start/end with success/failure status and total duration
+- **LLM calls** -- model invocation start/end with stop reasons
+- **Tool calls** -- tool name, inputs, outputs, duration, and success/failure status (collapsible)
+- **Sub-agent delegation** -- when the orchestrator delegates to a sub-agent, with nested indentation
+- **Streaming tokens** -- real-time text and reasoning/thinking output from the LLM
+- **Metrics summary** -- input/output/cache token counts, latency, cycle count, estimated cost, and per-tool stats
+- **Historical runs** -- browse past runs from a dropdown, with full event replay
 
 **Access the UI:**
 
 ```bash
-make langfuse-open    # Opens http://localhost:3000
+make monitor-open    # Opens http://localhost:3001
 ```
 
-**Default credentials:** `admin@local.dev` / `password`
-
-The Strands Agents SDK natively emits OpenTelemetry spans with `gen_ai.*` attributes (model, tokens, prompts, tool calls). Langfuse maps these to its data model automatically -- no additional instrumentation libraries are needed.
+No credentials required. The monitor starts automatically with `make up`.
 
 **How it works:**
 
-1. Both agent entrypoints (`main.py`, `code_fix_main.py`) call `setup_telemetry()` at startup
-2. This configures the Strands `StrandsTelemetry` OTLP exporter with Langfuse's `/api/public/otel` endpoint
-3. Strands automatically creates spans for every agent cycle, model invocation, and tool call
-4. Langfuse ingests these via OTLP HTTP and renders them in its web UI
+1. Both agent entrypoints (`main.py`, `code_fix_main.py`) call `setup_monitor()` at startup
+2. This creates a `MonitorHookProvider` (Strands lifecycle hooks) and a `MonitorCallbackHandler` (streaming tokens)
+3. Events are pushed over WebSocket to the monitor server at `ws://monitor:8765/ws/push`
+4. The monitor server stores events in SQLite and broadcasts them to browser clients via `ws://monitor:8765/ws/live`
+5. The browser dashboard renders events as they arrive with auto-scroll
 
-If `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` are not set, telemetry is silently skipped and the agents work as before.
+If `MONITOR_WS_URL` is not set, monitoring is silently skipped and the agents work as before.
 
 ### Ticket Contents
 
@@ -219,9 +216,8 @@ Each ticket file includes:
    git clone <repo-url>
    cd ai-agentic-dbt-debugger
     cp .env.example .env
-    # Edit .env and add your LOCALSTACK_AUTH_TOKEN, ANTHROPIC_API_KEY,
-    # GITHUB_AUTH_TOKEN, and GITHUB_REPO_URL
-    # (Langfuse credentials have working defaults — no changes needed)
+     # Edit .env and add your LOCALSTACK_AUTH_TOKEN, ANTHROPIC_API_KEY,
+     # GITHUB_AUTH_TOKEN, and GITHUB_REPO_URL
    ```
 
 2. **Build and start:**
@@ -231,7 +227,7 @@ Each ticket file includes:
    make up
    ```
 
-   This starts the LocalStack Snowflake emulator, the dbt container, the agent container, the code-env container, and the Langfuse observability stack. On startup, the init script (`localstack/init/ready.d/01_seed.py`) automatically creates the `BETTING` database, schemas, tables, and seed data. Langfuse auto-initializes with a default org, project, and API keys.
+   This starts the LocalStack Snowflake emulator, the dbt container, the agent container, the code-env container, and the live agent monitor. On startup, the init script (`localstack/init/ready.d/01_seed.py`) automatically creates the `BETTING` database, schemas, tables, and seed data.
 
 3. **Verify the setup:**
 
@@ -319,14 +315,15 @@ Each ticket file includes:
 
 | Target | Description |
 |---|---|
-| `make langfuse-open` | Open the Langfuse UI in your browser (http://localhost:3000) |
+| `make monitor-open` | Open the Agent Monitor UI in your browser (http://localhost:3001) |
+| `make monitor-logs` | Follow logs for the monitor service |
 
 ## Project Structure
 
 ```
 .
 ├── Makefile                          # All commands
-├── docker-compose.yml                # LocalStack + dbt + agent + code-env + Langfuse services
+├── docker-compose.yml                # LocalStack + dbt + agent + code-env + monitor services
 ├── .env.example                      # Template for secrets
 ├── agent/
 │   ├── Dockerfile                    # Python 3.12 + strands-agents
@@ -335,7 +332,7 @@ Each ticket file includes:
 │       ├── main.py                   # Entrypoint — accepts run_id, runs orchestrator
 │       ├── orchestrator.py           # Orchestrator agent (system prompt + tools)
 │       ├── code_fix_main.py          # Entrypoint — accepts run_id, runs code-fix agent
-│       ├── telemetry.py              # OTEL setup — exports Strands traces to Langfuse
+│       ├── monitor.py                # Live monitor — WebSocket hooks + streaming handler
 │       ├── agents/
 │       │   ├── ticket_agent.py       # Ticket Creator sub-agent (wrapped as @tool)
 │       │   └── code_fix_agent.py     # Code-Fix sub-agent (wrapped as @tool)
@@ -352,6 +349,16 @@ Each ticket file includes:
 │           ├── git_commit_and_push.py # Commit + push fix branch
 │           ├── create_pull_request.py # Create GitHub PR via gh CLI
 │           └── query_snowflake.py    # Read-only SQL queries against Snowflake
+├── monitor/
+│   ├── Dockerfile                    # Python 3.12 + FastAPI + uvicorn
+│   ├── requirements.txt             # Server dependencies
+│   ├── server.py                    # FastAPI app with WebSocket + REST endpoints
+│   ├── db.py                        # SQLite storage layer (WAL mode)
+│   ├── schema.sql                   # Database schema (runs + events tables)
+│   └── static/
+│       ├── index.html               # Dashboard HTML structure
+│       ├── style.css                # Dark-themed styling
+│       └── app.js                   # Dashboard JavaScript (WebSocket + rendering)
 ├── code-env/
 │   └── Dockerfile                    # Python 3.12 + git + gh CLI + dbt + agent
 ├── dbt/

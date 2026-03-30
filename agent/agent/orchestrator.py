@@ -49,13 +49,18 @@ Important:
 """
 
 
-def build_orchestrator(run_id: str = "") -> Agent:
+def build_orchestrator(run_id: str = "", monitor=None) -> Agent:
     """Construct the orchestrator agent with all tools wired up."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
         model_id="claude-sonnet-4-20250514",
         max_tokens=4096,
     )
+
+    kwargs = {}
+    if monitor:
+        kwargs["hooks"] = [monitor.hook_provider]
+        kwargs["callback_handler"] = monitor.callback_handler
 
     return Agent(
         model=model,
@@ -66,10 +71,5 @@ def build_orchestrator(run_id: str = "") -> Agent:
             read_model_sql,
             ticket_agent,
         ],
-        trace_attributes={
-            "session.id": f"ticket-{run_id}",
-            "langfuse.session.id": f"ticket-{run_id}",
-            "langfuse.user.id": "dbt-debugger",
-            "langfuse.trace.tags": ["ticket-agent", f"run:{run_id}"],
-        },
+        **kwargs,
     )

@@ -12,26 +12,33 @@ Exits with code 0 on success, 1 on failure.
 
 import os
 import sys
+import time
 import warnings
 
 from strands import Agent
 from strands.models.anthropic import AnthropicModel
 
 from agent.agents.code_fix_agent import code_fix_agent
-from agent.telemetry import setup_telemetry
+from agent.agents.code_fix_agent import set_monitor as set_code_fix_monitor
+from agent.monitor import setup_monitor
 
 # Suppress Pydantic serialization warnings from the Anthropic SDK
 # (ParsedTextBlock vs expected block type mismatches).
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 
-def build_code_fix_orchestrator(run_id: str = "") -> Agent:
+def build_code_fix_orchestrator(run_id: str = "", monitor=None) -> Agent:
     """Construct a lightweight orchestrator that delegates to the code-fix agent."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
         model_id="claude-sonnet-4-20250514",
         max_tokens=4096,
     )
+
+    kwargs = {}
+    if monitor:
+        kwargs["hooks"] = [monitor.hook_provider]
+        kwargs["callback_handler"] = monitor.callback_handler
 
     return Agent(
         model=model,
@@ -42,12 +49,7 @@ def build_code_fix_orchestrator(run_id: str = "") -> Agent:
             "explanation of why the fix could not be applied."
         ),
         tools=[code_fix_agent],
-        trace_attributes={
-            "session.id": f"code-fix-{run_id}",
-            "langfuse.session.id": f"code-fix-{run_id}",
-            "langfuse.user.id": "dbt-debugger",
-            "langfuse.trace.tags": ["code-fix-agent", f"run:{run_id}"],
-        },
+        **kwargs,
     )
 
 
@@ -58,18 +60,22 @@ def main() -> None:
 
     run_id = sys.argv[1]
 
-    # Configure OTEL trace export to Langfuse (no-op if creds not set)
-    setup_telemetry()
+    # Set up live monitoring (no-op if MONITOR_WS_URL not set)
+    monitor = setup_monitor(run_id=run_id, agent_type="code-fix")
+    set_code_fix_monitor(monitor)
 
     print(f"[code-fix] Attempting automated fix for failed dbt run: {run_id}")
+    monitor.emit("run_start", agent_type="code-fix")
 
-    orchestrator = build_code_fix_orchestrator(run_id=run_id)
+    start = time.time()
+    orchestrator = build_code_fix_orchestrator(run_id=run_id, monitor=monitor)
     response = orchestrator(
         f"A dbt run has failed and a ticket exists.  Run ID: {run_id}.  "
         f"Please invoke the code-fix agent to attempt an automated fix."
     )
 
     response_str = str(response)
+    duration = time.time() - start
     print(f"\n[code-fix] Done. Response:\n{response_str}")
 
     # Exit with error if the fix was not successfully applied
@@ -84,7 +90,12 @@ def main() -> None:
         "fix was not applied",
     ]
     response_lower = response_str.lower()
-    if any(indicator in response_lower for indicator in failure_indicators):
+    success = not any(indicator in response_lower for indicator in failure_indicators)
+
+    monitor.emit("run_end", agent_type="code-fix", success=success, duration_s=round(duration, 2))
+    monitor.close()
+
+    if not success:
         sys.exit(1)
 
 
