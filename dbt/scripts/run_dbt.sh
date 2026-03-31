@@ -29,7 +29,7 @@ echo "[run_dbt] Log:      ${LOG_FILE}"
 # abort on dbt failure (we want to write the manifest even on failure).
 set +e
 # shellcheck disable=SC2086
-dbt ${COMMAND} --log-format json 2>&1 | tee -a "$LOG_FILE"
+dbt ${COMMAND} --log-format json 2>&1 | tee -a "$LOG_FILE" | jq -r '.info.msg // empty' 2>/dev/null
 EXIT_CODE=$?
 set -e
 

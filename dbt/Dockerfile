@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git curl \
+    && apt-get install -y --no-install-recommends git curl jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Pin versions for reproducibility
