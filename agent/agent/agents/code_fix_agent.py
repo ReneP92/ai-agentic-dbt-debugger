@@ -15,7 +15,6 @@ from strands.models.anthropic import AnthropicModel
 
 from agent.tools.clone_repo import clone_repo
 from agent.tools.read_linear_issue import read_linear_issue
-from agent.tools.comment_linear_issue import comment_linear_issue
 from agent.tools.read_repo_file import read_repo_file
 from agent.tools.write_repo_file import write_repo_file
 from agent.tools.run_dbt_test import run_dbt_test
@@ -67,10 +66,6 @@ When invoked, follow these steps IN ORDER:
    - body: include the issue summary, what was changed, and why
    - base_branch: "main"
 
-8. LINK PR TO LINEAR ISSUE — call comment_linear_issue with the Linear
-   issue UUID (from step 2) and a comment body that includes the PR URL,
-   a brief summary of the fix, and what files were changed.
-
 Important rules:
 - You can ONLY modify files under ``dbt/models/``.  Do not touch anything else.
 - Always verify your fix with dbt test before pushing.
@@ -120,7 +115,6 @@ def _build_code_fix_agent() -> Agent:
         tools=[
             clone_repo,
             read_linear_issue,
-            comment_linear_issue,
             read_repo_file,
             write_repo_file,
             run_dbt_test,
@@ -138,8 +132,7 @@ def code_fix_agent(run_id: str) -> str:
 
     This tool wraps a separate Strands Agent that clones the repository,
     reads the failure issue from Linear, modifies the failing dbt model(s),
-    verifies the fix with ``dbt test``, creates a pull request on GitHub,
-    and comments on the Linear issue with the PR link.
+    verifies the fix with ``dbt test``, and creates a pull request on GitHub.
 
     The agent will retry up to 3 times if the fix does not pass
     verification.  If all retries fail, it returns an error message
@@ -160,7 +153,7 @@ def code_fix_agent(run_id: str) -> str:
         f"Run ID: {run_id}.  "
         f"Please clone the repository, read the failure issue from Linear, "
         f"fix the failing dbt model(s), verify your fix with dbt test, "
-        f"create a pull request, and comment on the Linear issue with the PR link."
+        f"and create a pull request."
     )
 
     response = agent(prompt)
