@@ -1,3 +1,5 @@
+![icon](./assets/corgi.png) 
+
 # ai-agentic-dbt-debugger
 
 A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates Linear issues with structured failure details, and opens GitHub pull requests with automated fixes. Includes a lightweight live monitoring dashboard for watching agent execution in real time — LLM calls, tool usage, token counts, and cost estimates streamed via WebSocket.
