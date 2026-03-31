@@ -1,6 +1,6 @@
 # ai-agentic-dbt-debugger
 
-A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates structured failure tickets, and opens GitHub pull requests with automated fixes. Includes a lightweight live monitoring dashboard for watching agent execution in real time — LLM calls, tool usage, token counts, and cost estimates streamed via WebSocket.
+A self-contained dbt project running against a [LocalStack Snowflake](https://docs.localstack.cloud/snowflake/) emulator, with an AI agent system that automatically investigates dbt pipeline failures, creates Linear issues with structured failure details, and opens GitHub pull requests with automated fixes. Includes a lightweight live monitoring dashboard for watching agent execution in real time — LLM calls, tool usage, token counts, and cost estimates streamed via WebSocket.
 
 ## Architecture
 
@@ -22,14 +22,9 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 │         │                         │  runs/        │       │          │
 │         │                         └───────────────┘       │          │
 │         │                                                 │          │
-│         │                         ┌───────────────┐       │          │
-│         │                         │  output/      │◄──────┘          │
-│         │                         │  tickets/     │  (rw)            │
-│         │                         └───────┬───────┘                  │
-│         │                                 │ (ro)                     │
-│         │  ┌───────────────────┐          │                          │
-│         │  │  code-env         │◄─────────┘                          │
-│         ◄──┤  (Python 3.12)    │  reads tickets, runs dbt test       │
+│         │  ┌───────────────────┐                          │          │
+│         │  │  code-env         │                          │          │
+│         ◄──┤  (Python 3.12)    │  reads Linear issues, runs dbt test │
 │            │  git + gh CLI     │  clones repo, pushes fix, opens PR  │
 │            │  dbt-snowflake    │──┐ WS push                         │
 │            │  Strands Agents   │  │                                  │
@@ -43,7 +38,7 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**LocalStack Snowflake** emulates a Snowflake warehouse locally so no cloud account is needed. The **dbt** container runs as a long-lived sidecar and all commands are issued via `docker compose exec`. The **agent** container runs the AI debugging agent -- it reads dbt logs and model SQL (read-only) and writes failure tickets to `output/tickets/`. The **code-env** container runs the Code-Fix agent -- it reads the ticket, clones the repo, fixes the dbt code, verifies with `dbt test`, and opens a GitHub PR. The **monitor** container provides a real-time browser dashboard for watching agent execution.
+**LocalStack Snowflake** emulates a Snowflake warehouse locally so no cloud account is needed. The **dbt** container runs as a long-lived sidecar and all commands are issued via `docker compose exec`. The **agent** container runs the AI debugging agent -- it reads dbt logs and model SQL (read-only) and creates Linear issues in the Data Alerts project with structured failure details. The **code-env** container runs the Code-Fix agent -- it reads the Linear issue, clones the repo, fixes the dbt code, verifies with `dbt test`, opens a GitHub PR, and comments on the Linear issue with the PR link. The **monitor** container provides a real-time browser dashboard for watching agent execution.
 
 ## Data Model
 
@@ -72,7 +67,7 @@ RAW (source)
 
 ## Agent System
 
-The agent system reacts to dbt run failures. When a dbt command exits non-zero, a wrapper script invokes the AI agent to investigate the failure and produce a structured ticket.
+The agent system reacts to dbt run failures. When a dbt command exits non-zero, a wrapper script invokes the AI agent to investigate the failure and create a Linear issue.
 
 ### How It Works
 
@@ -97,14 +92,16 @@ scripts/dbt_with_agent.sh
                    ▼
 ┌─────────────────────────────────────────────┐
 │  Ticket Creator Sub-Agent                   │
-│  (classifies severity, writes summary)      │
+│  (classifies severity, estimates effort,    │
+│   writes summary)                           │
 │                                             │
 │  Tools:                                     │
-│    create_ticket  ── writes .txt to disk     │
+│    create_linear_issue ── Linear API         │
 └──────────────────┬──────────────────────────┘
                    │
                    ▼
-         output/tickets/<run_id>_ticket.txt
+         Linear Issue (Data Alerts project)
+         e.g. REN-42
 ```
 
 ### Multi-Agent Pattern
@@ -113,16 +110,16 @@ Built with the [Strands Agents SDK](https://github.com/strands-agents/sdk-python
 
 - **Orchestrator Agent** -- has a system prompt focused on investigating failures step-by-step. It reads the manifest, parses the logs, retrieves SQL source for failed models, then delegates to the sub-agent.
 - **Ticket Creator Sub-Agent** -- a separate `Agent` instance with its own system prompt focused on severity classification and writing actionable summaries. Exposed as a `@tool` so the orchestrator can call it.
-- **Code-Fix Sub-Agent** -- a separate `Agent` instance that clones the repo, reads the ticket, fixes dbt model files, verifies with `dbt test`, and opens a GitHub PR. Exposed as a `@tool` so its orchestrator can call it.
+- **Code-Fix Sub-Agent** -- a separate `Agent` instance that clones the repo, reads the Linear issue, fixes dbt model files, verifies with `dbt test`, opens a GitHub PR, and links the PR back to the Linear issue. Exposed as a `@tool` so its orchestrator can call it.
 
 All agents use **Claude Sonnet 4** via the Anthropic API.
 
 ### Code-Fix Agent
 
-After the ticket is created, the code-fix agent attempts an automated repair:
+After the Linear issue is created, the code-fix agent attempts an automated repair:
 
 ```
-output/tickets/<run_id>_ticket.txt
+Linear Issue (Data Alerts project)
       │
       ▼
 ┌─────────────────────────────────────────────┐
@@ -136,22 +133,26 @@ output/tickets/<run_id>_ticket.txt
                    ▼
 ┌─────────────────────────────────────────────┐
 │  Code-Fix Sub-Agent                         │
-│  (clones repo, reads ticket, fixes code,    │
-│   verifies, commits, opens PR)              │
+│  (clones repo, reads Linear issue, fixes    │
+│   code, verifies, commits, opens PR,        │
+│   comments on Linear issue)                 │
 │                                             │
 │  Tools:                                     │
-│    clone_repo          ── git clone + branch │
-│    read_ticket         ── read failure ticket│
-│    read_repo_file      ── read dbt SQL/YAML  │
-│    write_repo_file     ── write fixed files  │
-│    run_dbt_test        ── verify fix works   │
-│    git_commit_and_push ── commit + push      │
-│    create_pull_request ── gh pr create       │
+│    clone_repo            ── git clone+branch │
+│    read_linear_issue     ── read from Linear │
+│    comment_linear_issue  ── link PR to issue │
+│    read_repo_file        ── read dbt SQL/YAML│
+│    write_repo_file       ── write fixed files│
+│    run_dbt_test          ── verify fix works │
+│    git_commit_and_push   ── commit + push    │
+│    create_pull_request   ── gh pr create     │
+│    query_snowflake       ── inspect data     │
 └──────────────────┬──────────────────────────┘
                    │
                    ▼
          GitHub Pull Request
          (branch: fix/dbt-<run_id>)
+         + Linear issue comment with PR link
 ```
 
 **Retry logic:** If `dbt test` fails after writing a fix, the agent reads the error output, adjusts the fix, and retries (up to 3 attempts). If all retries are exhausted, the agent exits with a non-zero code without pushing any code.
@@ -190,16 +191,17 @@ No credentials required. The monitor starts automatically with `make up`.
 
 If `MONITOR_WS_URL` is not set, monitoring is silently skipped and the agents work as before.
 
-### Ticket Contents
+### Linear Issue Contents
 
-Each ticket file includes:
+Each Linear issue in the Data Alerts project includes:
 
-- **Severity** -- CRITICAL / HIGH / MEDIUM / LOW (classified by the LLM)
+- **Priority** -- Urgent / High / Medium / Low (mapped from severity classification)
+- **Estimate** -- T-shirt size (XS/S/M/L/XL) mapped to Fibonacci points (1/2/3/5/8)
 - **Summary** -- what failed, likely root cause, impact on downstream models, suggested fixes
 - **Failed models** -- which dbt models failed
 - **Error messages** -- extracted from the dbt JSON logs
 - **SQL source** -- the SQL of the failing model(s)
-- **Run metadata** -- command, exit code, timestamp
+- **Run metadata** -- run ID, command, exit code, timestamp
 
 ## Prerequisites
 
@@ -207,6 +209,7 @@ Each ticket file includes:
 - A [LocalStack auth token](https://app.localstack.cloud/) (free trial available)
 - An [Anthropic API key](https://console.anthropic.com/) (required for the agent)
 - A [GitHub PAT](https://github.com/settings/tokens) with repo push + PR permissions (required for code-fix agent)
+- A [Linear API key](https://linear.app/settings/api) (personal API key for issue management)
 
 ## Quick Start
 
@@ -217,7 +220,7 @@ Each ticket file includes:
    cd ai-agentic-dbt-debugger
     cp .env.example .env
      # Edit .env and add your LOCALSTACK_AUTH_TOKEN, ANTHROPIC_API_KEY,
-     # GITHUB_AUTH_TOKEN, and GITHUB_REPO_URL
+      # GITHUB_AUTH_TOKEN, GITHUB_REPO_URL, and LINEAR_AUTH_TOKEN
    ```
 
 2. **Build and start:**
@@ -257,8 +260,9 @@ Each ticket file includes:
    make dbt-run-agent
 
    # The agent will:
-   # 1. Investigate and write a ticket to output/tickets/
+   # 1. Investigate and create a Linear issue in the Data Alerts project
    # 2. Attempt an automated fix and open a GitHub PR (requires GITHUB_AUTH_TOKEN)
+   # 3. Comment on the Linear issue with the PR link
    ```
 
    To manually invoke individual agents against a past failed run:
@@ -332,6 +336,7 @@ Each ticket file includes:
 │       ├── main.py                   # Entrypoint — accepts run_id, runs orchestrator
 │       ├── orchestrator.py           # Orchestrator agent (system prompt + tools)
 │       ├── code_fix_main.py          # Entrypoint — accepts run_id, runs code-fix agent
+│       ├── linear_client.py          # Linear GraphQL API client (issue CRUD, comments)
 │       ├── monitor.py                # Live monitor — WebSocket hooks + streaming handler
 │       ├── agents/
 │       │   ├── ticket_agent.py       # Ticket Creator sub-agent (wrapped as @tool)
@@ -340,9 +345,10 @@ Each ticket file includes:
 │           ├── read_dbt_manifest.py  # Read run manifest JSON
 │           ├── read_dbt_logs.py      # Parse dbt JSON log lines for errors
 │           ├── read_model_sql.py     # Read .sql source for a model name
-│           ├── create_ticket.py      # Write structured ticket .txt file
+│           ├── create_linear_issue.py # Create Linear issue for dbt failure
+│           ├── read_linear_issue.py  # Read Linear issue by run_id search
+│           ├── comment_linear_issue.py # Add comment to Linear issue (PR link)
 │           ├── clone_repo.py         # Clone repo + create fix branch
-│           ├── read_ticket.py        # Read failure ticket file
 │           ├── read_repo_file.py     # Read file from cloned workspace
 │           ├── write_repo_file.py    # Write file in cloned workspace
 │           ├── run_dbt_test.py       # Run dbt test for verification
@@ -390,8 +396,6 @@ Each ticket file includes:
 ├── scripts/
 │   ├── dbt_with_agent.sh             # Host-side wrapper: dbt run + agent + code-fix
 │   └── inspect_data.py               # Utility to introspect tables in LocalStack
-├── output/
-│   └── tickets/                      # Agent-generated failure tickets
 └── logs/
     └── dbt/                          # Bind-mounted dbt logs (gitignored)
 ```
@@ -423,5 +427,7 @@ You should see `BETTING database seeded successfully.` in the output.
 **Agent fails with authentication error** -- Ensure `ANTHROPIC_API_KEY` is set in your `.env` file. The agent container reads this at startup. After updating `.env`, restart the agent: `docker compose restart agent`.
 
 **Code-fix agent fails to push/create PR** -- Ensure `GITHUB_AUTH_TOKEN` and `GITHUB_REPO_URL` are set in your `.env` file. The token needs repo push and PR creation permissions. After updating `.env`, restart the code-env container: `docker compose restart code-env`.
+
+**Linear issue creation fails** -- Ensure `LINEAR_AUTH_TOKEN` is set in your `.env` file with a valid Linear personal API key. The agent needs access to a team with key `REN` and a project named `Data Alerts`. After updating `.env`, restart the agent: `docker compose restart agent code-env`.
 
 **Agent container not starting** -- Run `make build` to rebuild the agent image after any changes to `agent/`, then `make up`.

@@ -1,7 +1,7 @@
 """Ticket Creator sub-agent.
 
 A dedicated Strands Agent with its own system prompt, responsible for
-analyzing dbt failure context and writing a well-structured ticket.
+analyzing dbt failure context and creating a Linear issue.
 Exposed as a @tool so the orchestrator can invoke it via the
 "agents as tools" pattern.
 """
@@ -11,7 +11,7 @@ import os
 from strands import Agent, tool
 from strands.models.anthropic import AnthropicModel
 
-from agent.tools.create_ticket import create_ticket
+from agent.tools.create_linear_issue import create_linear_issue
 
 TICKET_AGENT_SYSTEM_PROMPT = """\
 You are a Ticket Creator agent specialising in dbt pipeline failures.
@@ -30,7 +30,14 @@ Your job:
      some consumers may be affected.
    - MEDIUM: A non-critical model or test failed; impact is limited.
    - LOW: A warning or cosmetic issue; no data quality impact.
-4. Call the create_ticket tool with all the information to persist the ticket.
+4. Estimate the FIX EFFORT as a t-shirt size:
+   - XS: Trivial fix (typo, missing comma, obvious one-liner).
+   - S: Small fix (single file change, straightforward logic fix).
+   - M: Moderate fix (may require changes to multiple files or some investigation).
+   - L: Large fix (complex logic change, multiple models affected).
+   - XL: Very large fix (architectural issue, widespread impact).
+5. Call the create_linear_issue tool with all the information to create a
+   Linear issue in the Data Alerts project.  Include the estimate_size.
 
 Be direct, technical, and actionable.  Do NOT include pleasantries or filler.
 """
@@ -61,7 +68,7 @@ def _build_ticket_agent() -> Agent:
     return Agent(
         model=model,
         system_prompt=TICKET_AGENT_SYSTEM_PROMPT,
-        tools=[create_ticket],
+        tools=[create_linear_issue],
         **kwargs,
     )
 
@@ -93,7 +100,7 @@ def ticket_agent(
         sql_snippets: List of SQL source code from the failing models.
 
     Returns:
-        The ticket agent's response including confirmation of the ticket file created.
+        The ticket agent's response including confirmation of the Linear issue created.
     """
     agent = _build_ticket_agent()
 
@@ -111,7 +118,7 @@ def ticket_agent(
         + "\n---\n".join(sql_snippets)
         + "\n\n"
         f"Please analyse the failure, classify its severity, write a summary, "
-        f"and create the ticket."
+        f"estimate the fix effort (t-shirt size), and create the Linear issue."
     )
 
     response = agent(prompt)

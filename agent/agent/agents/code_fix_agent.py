@@ -14,7 +14,8 @@ from strands import Agent, tool
 from strands.models.anthropic import AnthropicModel
 
 from agent.tools.clone_repo import clone_repo
-from agent.tools.read_ticket import read_ticket
+from agent.tools.read_linear_issue import read_linear_issue
+from agent.tools.comment_linear_issue import comment_linear_issue
 from agent.tools.read_repo_file import read_repo_file
 from agent.tools.write_repo_file import write_repo_file
 from agent.tools.run_dbt_test import run_dbt_test
@@ -32,13 +33,14 @@ When invoked, follow these steps IN ORDER:
 1. CLONE THE REPO — call clone_repo with the run_id to clone the repository
    and create a fix branch named ``fix/dbt-<run_id>``.
 
-2. READ THE TICKET — call read_ticket with the run_id to understand what
-   failed, the severity, error messages, and which models are involved.
+2. READ THE LINEAR ISSUE — call read_linear_issue with the run_id to
+   understand what failed, the severity, error messages, and which models
+   are involved.
 
 3. READ THE FAILING FILES — for each failing model, call read_repo_file to
    read the current SQL source (e.g. ``dbt/models/conformed/fct_bet.sql``)
    and/or schema YAML (e.g. ``dbt/models/conformed/schema.yml``).
-   Use the file paths from the ticket's SQL section and error messages to
+   Use the file paths from the issue's SQL section and error messages to
    determine which files to read.
 
 4. WRITE THE FIX — call write_repo_file to write the corrected file content.
@@ -62,8 +64,12 @@ When invoked, follow these steps IN ORDER:
 7. CREATE PULL REQUEST — call create_pull_request with:
    - branch_name: the fix branch
    - title: a concise description of the fix
-   - body: include the ticket summary, what was changed, and why
+   - body: include the issue summary, what was changed, and why
    - base_branch: "main"
+
+8. LINK PR TO LINEAR ISSUE — call comment_linear_issue with the Linear
+   issue UUID (from step 2) and a comment body that includes the PR URL,
+   a brief summary of the fix, and what files were changed.
 
 Important rules:
 - You can ONLY modify files under ``dbt/models/``.  Do not touch anything else.
@@ -113,7 +119,8 @@ def _build_code_fix_agent() -> Agent:
         system_prompt=CODE_FIX_AGENT_SYSTEM_PROMPT,
         tools=[
             clone_repo,
-            read_ticket,
+            read_linear_issue,
+            comment_linear_issue,
             read_repo_file,
             write_repo_file,
             run_dbt_test,
@@ -130,15 +137,16 @@ def code_fix_agent(run_id: str) -> str:
     """Delegate to the Code-Fix sub-agent to automatically fix a dbt failure.
 
     This tool wraps a separate Strands Agent that clones the repository,
-    reads the failure ticket, modifies the failing dbt model(s), verifies
-    the fix with ``dbt test``, and creates a pull request on GitHub.
+    reads the failure issue from Linear, modifies the failing dbt model(s),
+    verifies the fix with ``dbt test``, creates a pull request on GitHub,
+    and comments on the Linear issue with the PR link.
 
     The agent will retry up to 3 times if the fix does not pass
     verification.  If all retries fail, it returns an error message
     without pushing any code.
 
     Args:
-        run_id: The dbt run identifier.  Used to read the correct ticket
+        run_id: The dbt run identifier.  Used to find the Linear issue
                 and name the fix branch.
 
     Returns:
@@ -148,11 +156,11 @@ def code_fix_agent(run_id: str) -> str:
     agent = _build_code_fix_agent()
 
     prompt = (
-        f"A dbt run has failed and a ticket has been created.  "
+        f"A dbt run has failed and a Linear issue has been created.  "
         f"Run ID: {run_id}.  "
-        f"Please clone the repository, read the failure ticket, "
+        f"Please clone the repository, read the failure issue from Linear, "
         f"fix the failing dbt model(s), verify your fix with dbt test, "
-        f"and create a pull request."
+        f"create a pull request, and comment on the Linear issue with the PR link."
     )
 
     response = agent(prompt)

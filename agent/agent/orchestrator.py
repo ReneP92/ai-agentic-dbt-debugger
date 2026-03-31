@@ -35,10 +35,12 @@ When invoked with a run ID, follow these steps IN ORDER:
 4. DELEGATE TO TICKET AGENT — call ticket_agent with all the gathered
    context: run_id, command, exit_code, started_at, failed_models,
    error_messages, and sql_snippets.  The ticket agent will classify
-   severity, write a summary, and persist the ticket file.
+   severity, estimate the fix effort, and create a Linear issue in the
+   Data Alerts project.
 
-5. REPORT — once the ticket agent confirms the ticket was created,
-   output a brief confirmation message with the ticket path and severity.
+5. REPORT — once the ticket agent confirms the Linear issue was created,
+   output a brief confirmation message with the issue identifier (e.g.
+   REN-42), URL, and severity.
 
 Important:
 - Always complete all steps.  Do not skip reading the SQL.
