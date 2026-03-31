@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Activity, Database } from 'lucide-react'
+import { Activity, Database, Trash2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import type { ConnectionStatus } from '../../types'
 
@@ -11,6 +11,7 @@ const statusConfig: Record<ConnectionStatus, { label: string; dot: string; text:
 
 export function StatusBar() {
   const status = useStore((s) => s.connectionStatus)
+  const clearAll = useStore((s) => s.clearAll)
   const { label, dot, text } = statusConfig[status]
 
   return (
@@ -31,9 +32,19 @@ export function StatusBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-text-muted">
-        <Database size={13} />
-        <span className="text-xs">SQLite</span>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 text-text-muted">
+          <Database size={13} />
+          <span className="text-xs">SQLite</span>
+        </div>
+        <button
+          onClick={clearAll}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs text-text-muted border border-border hover:border-accent-red/50 hover:text-accent-red hover:bg-accent-red/10 transition-colors"
+          title="Clear all runs from view"
+        >
+          <Trash2 size={12} />
+          Clear
+        </button>
       </div>
     </header>
   )

@@ -22,6 +22,7 @@ interface State {
   setAutoScroll: (v: boolean) => void
   upsertRun: (run: RunInfo) => void
   prependRuns: (runs: RunInfo[]) => void
+  clearAll: () => void
 }
 
 export const useStore = create<State>()(
@@ -145,6 +146,16 @@ export const useStore = create<State>()(
     setAutoScroll: (v) =>
       set((state) => {
         state.autoScroll = v
+      }),
+
+    clearAll: () =>
+      set((state) => {
+        state.runs = {}
+        state.runOrder = []
+        state.selectedRunId = null
+        state.liveRunId = null
+        state.tree = createEmptyTreeState()
+        state.selectedNodeId = null
       }),
   })),
 )
