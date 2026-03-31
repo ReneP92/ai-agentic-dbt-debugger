@@ -70,7 +70,7 @@ def main() -> None:
     start = time.time()
     orchestrator = build_code_fix_orchestrator(run_id=run_id, monitor=monitor)
     response = orchestrator(
-        f"A dbt run has failed and a ticket exists.  Run ID: {run_id}.  "
+        f"A dbt run has failed and a Linear issue has been created.  Run ID: {run_id}.  "
         f"Please invoke the code-fix agent to attempt an automated fix."
     )
 

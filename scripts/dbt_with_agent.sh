@@ -42,10 +42,11 @@ docker compose exec agent python -m agent.main "$RUN_ID"
 AGENT_EXIT=$?
 
 if [ "$AGENT_EXIT" -ne 0 ]; then
-    echo "[WARN] Agent exited with code ${AGENT_EXIT}"
+    echo "[ERROR] Agent failed (exit ${AGENT_EXIT}) — skipping code-fix."
+    exit "$DBT_EXIT"
 fi
 
-echo "=== Done. Check output/tickets/ for the failure ticket. ==="
+echo "=== Linear issue created. ==="
 
 # ── Step 2: Code-Fix Agent ────────────────────────────────────────────────────
 # Attempt an automated fix: clone repo, modify dbt files, verify, and open a PR.

@@ -80,7 +80,19 @@ class LinearClient:
             json={"query": query, "variables": variables or {}},
             timeout=30,
         )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            # Extract response body for debugging context
+            detail = ""
+            try:
+                detail = resp.text[:500]
+            except Exception:
+                pass
+            raise LinearClientError(
+                f"HTTP {resp.status_code} from Linear API: {detail}"
+            ) from exc
+
         body = resp.json()
 
         if "errors" in body:
@@ -123,7 +135,7 @@ class LinearClient:
     def _resolve_project(self) -> None:
         data = self._request(
             """
-            query Projects {
+            query Projects($name: String!) {
               projects(filter: { name: { eq: $name } }) {
                 nodes { id name }
               }

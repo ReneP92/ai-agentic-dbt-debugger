@@ -39,16 +39,42 @@ def main() -> None:
         run_id=run_id,
         monitor=monitor,
     )
-    response = orchestrator(
-        f"A dbt run has failed.  Run ID: {run_id}.  "
-        f"Please investigate the failure and create a ticket."
-    )
 
+    try:
+        response = orchestrator(
+            f"A dbt run has failed.  Run ID: {run_id}.  "
+            f"Please investigate the failure and create a Linear issue."
+        )
+    except Exception as exc:
+        duration = time.time() - start
+        print(f"\n[agent] FATAL: Agent crashed: {exc}", file=sys.stderr)
+        monitor.emit("run_end", agent_type="ticket", success=False, duration_s=round(duration, 2))
+        monitor.close()
+        sys.exit(1)
+
+    response_str = str(response)
     duration = time.time() - start
-    monitor.emit("run_end", agent_type="ticket", success=True, duration_s=round(duration, 2))
+
+    # Detect whether the Linear issue was actually created
+    failure_indicators = [
+        "could not",
+        "failed to",
+        "unable to",
+        "error",
+        "api connection issue",
+        "not configured",
+    ]
+    response_lower = response_str.lower()
+    success = not any(indicator in response_lower for indicator in failure_indicators)
+
+    monitor.emit("run_end", agent_type="ticket", success=success, duration_s=round(duration, 2))
     monitor.close()
 
-    print(f"\n[agent] Done. Response:\n{response}")
+    print(f"\n[agent] Done. Response:\n{response_str}")
+
+    if not success:
+        print("[agent] FATAL: Ticket creation failed — aborting pipeline.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
