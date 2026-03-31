@@ -7,33 +7,31 @@ A self-contained dbt project running against a [LocalStack Snowflake](https://do
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│  Docker Compose (dbt-net bridge network)                                                                                                    │
-│                                                                                                                                             │
-│                                                                                                                                             │
-│   ┌─────────────────────┐         ┌─────────────────────┐        ┌───────────────┐        ┌─────────────────────┐        ┌────────────────┐  │
-│   │  localstack         │         │  dbt                │  (rw)  │               │  (ro)  │  agent              │        │  code-env      │  │
-│   │                     │         │                     │───────>│   logs/dbt/   │<───────│                     │        │                │  │
-│   │  Snowflake emu      │◄────────│  Python 3.12        │        │   runs/       │        │  Python 3.12        │        │  Python 3.12   │  │
-│   │  Port 4566          │         │  dbt-snowflake 1.9.1│        │               │        │  Strands Agents     │        │  git + gh CLI  │  │
-│   │                     │         │                     │        └───────────────┘        │  Claude Sonnet 4    │        │  dbt-snowflake │  │
-│   │                     │         │                     │                                 │                     │        │  Strands Agents│  │
-│   └─────────────────────┘         └─────────────────────┘                                 └──────────┬──────────┘        └───────┬────────┘  │
-│          ▲                                                                                           │                          │           │
-│          │                                                                                           │  WS push                 │  WS push  │
-│          │                                                                                           │                          │           │
-│          │                         reads Linear issues, runs dbt test                                │                          │           │
-│          └─────────────────────────clones repo, pushes fix, opens PR─────────────────────────────────────────────────────────────┘           │
-│                                                                                                      │                          │           │
-│                                                                                                      ▼                          ▼           │
-│                                                                                ┌─────────────────────────────────────────────────────────┐   │
-│                                                                                │  monitor (:3001)                                       │   │
-│                                                                                │                                                        │   │
-│                                                                                │  FastAPI  +  WebSocket  +  SQLite                       │   │
-│                                                                                │  Vanilla HTML/JS/CSS dashboard                          │   │
-│                                                                                └─────────────────────────────────────────────────────────┘   │
-│                                                                                                                                             │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│  Docker Compose (dbt-net bridge network)                                                   │
+│                                                                                            │
+│  ┌──────────────┐      ┌──────────────┐    ┌─────────┐    ┌───────────────────────────┐    │
+│  │ localstack   │      │ dbt          │(rw)│logs/dbt/│(ro)│ agent                     │    │
+│  │              │◄─────│              │───>│ runs/   │<───│                           │    │
+│  │ Snowflake emu│      │ Python 3.12  │    │         │    │ Python 3.12               │    │
+│  │ Port 4566    │      │ dbt-snowflake│    └─────────┘    │ Strands / Claude Sonnet 4 │    │
+│  └──────────────┘      └──────────────┘                   └─────────────┬─────────────┘    │
+│         ▲                                                               │  WS push         │
+│         │                                                               │                  │
+│  ┌──────┴─────────────────────────────────────────────────┐             │                  │
+│  │ code-env                                               │             │                  │
+│  │                                                        │             │                  │
+│  │ Python 3.12  ·  git + gh CLI  ·  dbt-snowflake         │             │                  │
+│  │ Strands / Claude Sonnet 4                              │             │                  │
+│  │ reads Linear issues, runs dbt test                     ├── WS push ──┤                  │
+│  │ clones repo, pushes fix, opens PR                      │             │                  │
+│  └────────────────────────────────────────────────────────┘             │                  │
+│                                                                         │                  │
+│            ┌────────────────────────────────────────────────────────────┴───────────────┐  │
+│            │ monitor (:3001)                                                            │  │
+│            │ FastAPI + WebSocket + SQLite · Vanilla HTML/JS/CSS dashboard               │  │
+│            └────────────────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **LocalStack Snowflake** emulates a Snowflake warehouse locally so no cloud account is needed. The **dbt** container runs as a long-lived sidecar and all commands are issued via `docker compose exec`. The **agent** container runs the AI debugging agent -- it reads dbt logs and model SQL (read-only) and creates Linear issues in the Data Alerts project with structured failure details. The **code-env** container runs the Code-Fix agent -- it reads the Linear issue, clones the repo, fixes the dbt code, verifies with `dbt test`, and opens a GitHub PR. The **monitor** container provides a real-time browser dashboard for watching agent execution.
