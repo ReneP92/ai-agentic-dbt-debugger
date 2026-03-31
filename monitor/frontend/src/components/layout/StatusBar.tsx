@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Activity, Database, Trash2 } from 'lucide-react'
+import { Database, Trash2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import type { ConnectionStatus } from '../../types'
 
@@ -18,9 +18,7 @@ export function StatusBar() {
     <header className="h-12 flex items-center justify-between px-4 border-b border-border bg-panel shrink-0">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-accent-blue/20 flex items-center justify-center">
-            <Activity size={14} className="text-accent-blue" />
-          </div>
+          <img src="/corgi.png" alt="logo" className="w-7 h-7 rounded-md object-cover" />
           <span className="font-semibold text-sm text-text-primary tracking-tight">
             dbt Agent Monitor
           </span>
