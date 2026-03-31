@@ -17,7 +17,7 @@ models:
       - name: registration_device
         tests:
           - accepted_values:
-              values: ['mobile', 'unknown']
+              values: ['mobile', 'desktop', 'unknown']
 
   - name: fct_bet
     description: "Bet fact table joined to user dimension, with gross gaming revenue and settlement flags."
