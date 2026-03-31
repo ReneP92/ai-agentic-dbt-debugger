@@ -56,7 +56,7 @@ def _build_ticket_agent() -> Agent:
     """Construct the ticket creator agent with its own model and tools."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
-        model_id="claude-sonnet-4-20250514",
+        model_id="claude-sonnet-4-6",
         max_tokens=4096,
     )
 

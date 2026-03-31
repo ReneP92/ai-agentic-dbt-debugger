@@ -55,7 +55,7 @@ def build_orchestrator(run_id: str = "", monitor=None) -> Agent:
     """Construct the orchestrator agent with all tools wired up."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
-        model_id="claude-sonnet-4-20250514",
+        model_id="claude-sonnet-4-6",
         max_tokens=4096,
     )
 

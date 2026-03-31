@@ -31,7 +31,7 @@ def build_code_fix_orchestrator(run_id: str = "", monitor=None) -> Agent:
     """Construct a lightweight orchestrator that delegates to the code-fix agent."""
     model = AnthropicModel(
         client_args={"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
-        model_id="claude-sonnet-4-20250514",
+        model_id="claude-sonnet-4-6",
         max_tokens=4096,
     )
 
