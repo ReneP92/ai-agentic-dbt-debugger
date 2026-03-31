@@ -13,6 +13,7 @@ import warnings
 
 from agent.monitor import setup_monitor
 from agent.orchestrator import build_orchestrator
+from agent.retry import invoke_with_retry
 from agent.agents.ticket_agent import set_monitor as set_ticket_monitor
 
 # Suppress Pydantic serialization warnings from the Anthropic SDK
@@ -41,9 +42,11 @@ def main() -> None:
     )
 
     try:
-        response = orchestrator(
+        response = invoke_with_retry(
+            orchestrator,
             f"A dbt run has failed.  Run ID: {run_id}.  "
-            f"Please investigate the failure and create a Linear issue."
+            f"Please investigate the failure and create a Linear issue.",
+            label="agent",
         )
     except Exception as exc:
         duration = time.time() - start

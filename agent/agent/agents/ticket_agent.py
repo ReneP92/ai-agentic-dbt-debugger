@@ -11,6 +11,7 @@ import os
 from strands import Agent, tool
 from strands.models.anthropic import AnthropicModel
 
+from agent.retry import invoke_with_retry
 from agent.tools.create_linear_issue import create_linear_issue
 
 TICKET_AGENT_SYSTEM_PROMPT = """\
@@ -121,5 +122,5 @@ def ticket_agent(
         f"estimate the fix effort (t-shirt size), and create the Linear issue."
     )
 
-    response = agent(prompt)
+    response = invoke_with_retry(agent, prompt, label="ticket-agent")
     return str(response)

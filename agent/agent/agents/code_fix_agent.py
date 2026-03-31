@@ -13,6 +13,7 @@ import os
 from strands import Agent, tool
 from strands.models.anthropic import AnthropicModel
 
+from agent.retry import invoke_with_retry
 from agent.tools.clone_repo import clone_repo
 from agent.tools.read_linear_issue import read_linear_issue
 from agent.tools.read_repo_file import read_repo_file
@@ -156,5 +157,5 @@ def code_fix_agent(run_id: str) -> str:
         f"and create a pull request."
     )
 
-    response = agent(prompt)
+    response = invoke_with_retry(agent, prompt, label="code-fix-agent")
     return str(response)

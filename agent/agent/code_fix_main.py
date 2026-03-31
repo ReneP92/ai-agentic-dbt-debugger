@@ -21,6 +21,7 @@ from strands.models.anthropic import AnthropicModel
 from agent.agents.code_fix_agent import code_fix_agent
 from agent.agents.code_fix_agent import set_monitor as set_code_fix_monitor
 from agent.monitor import setup_monitor
+from agent.retry import invoke_with_retry
 
 # Suppress Pydantic serialization warnings from the Anthropic SDK
 # (ParsedTextBlock vs expected block type mismatches).
@@ -69,10 +70,20 @@ def main() -> None:
 
     start = time.time()
     orchestrator = build_code_fix_orchestrator(run_id=run_id, monitor=monitor)
-    response = orchestrator(
-        f"A dbt run has failed and a Linear issue has been created.  Run ID: {run_id}.  "
-        f"Please invoke the code-fix agent to attempt an automated fix."
-    )
+
+    try:
+        response = invoke_with_retry(
+            orchestrator,
+            f"A dbt run has failed and a Linear issue has been created.  Run ID: {run_id}.  "
+            f"Please invoke the code-fix agent to attempt an automated fix.",
+            label="code-fix",
+        )
+    except Exception as exc:
+        duration = time.time() - start
+        print(f"\n[code-fix] FATAL: Agent crashed: {exc}", file=sys.stderr)
+        monitor.emit("run_end", agent_type="code-fix", success=False, duration_s=round(duration, 2))
+        monitor.close()
+        sys.exit(1)
 
     response_str = str(response)
     duration = time.time() - start
