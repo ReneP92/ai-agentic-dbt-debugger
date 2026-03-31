@@ -14,8 +14,10 @@ import time
 import anthropic
 from strands.types.exceptions import ModelThrottledException
 
-MAX_RETRIES = 3
-BACKOFF_BASE = 2  # seconds: 2s, 4s, 8s
+MAX_RETRIES = 6
+BACKOFF_BASE = 2   # seconds: 5, 10, 20, 40, 60, 60 (capped)
+INITIAL_DELAY = 5  # first retry starts at 5s
+MAX_DELAY = 60     # cap so we don't wait forever
 
 
 def is_retryable(exc: Exception) -> bool:
@@ -71,7 +73,7 @@ def invoke_with_retry(agent, prompt: str, *, label: str = "agent"):
 
             if not retryable or attempt == MAX_RETRIES:
                 raise
-            delay = BACKOFF_BASE ** attempt
+            delay = min(MAX_DELAY, INITIAL_DELAY * (BACKOFF_BASE ** (attempt - 1)))
             print(f"[{label}] Transient API error (attempt {attempt}/{MAX_RETRIES}): {exc}")
             print(f"[{label}] Retrying in {delay}s...")
             time.sleep(delay)
