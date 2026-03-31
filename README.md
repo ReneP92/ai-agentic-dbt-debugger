@@ -1,4 +1,4 @@
-![icon](./assets/corgi.png) 
+<img src="./assets/corgi.png" alt="icon" width="80" />
 
 # ai-agentic-dbt-debugger
 
